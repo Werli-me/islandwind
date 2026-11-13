@@ -85,7 +85,13 @@ inline void DrawPhoneBanner(const POINT& mp) {
     D2D1_RECT_F nameRect = D2D1::RectF(bannerRect.left + 64.0f, bannerRect.top + 12.0f, bannerRect.right - 34.0f, bannerRect.top + 36.0f);
     D2D1_RECT_F textRect = D2D1::RectF(bannerRect.left + 64.0f, bannerRect.top + 38.0f, bannerRect.right - 16.0f, bannerRect.bottom - 10.0f);
 
-    std::wstring header = g_phoneEvent.isCall ? (L"Входящий вызов: " + g_phoneEvent.title) : g_phoneEvent.title;
+    std::wstring prefix = (!g_phoneEvent.appName.empty() && g_phoneEvent.appName != g_phoneEvent.title)
+        ? (L"[" + g_phoneEvent.appName + L"] ")
+        : L"";
+    std::wstring header = g_phoneEvent.isCall
+        ? (L"Входящий вызов: " + g_phoneEvent.title)
+        : (prefix + g_phoneEvent.title);
+
     DrawScrollingText(SLOT_TITLE, header, g_pTextFormatLeftTitle, nameRect, g_pBrushText);
     DrawScrollingText(SLOT_ARTIST, g_phoneEvent.body, g_pTextFormatLeftSub, textRect, g_pBrushTextMuted);
 
@@ -97,7 +103,7 @@ inline void DrawPhoneBanner(const POINT& mp) {
 
 inline void DrawPhoneTab(float left, float top, float right, const POINT& mp) {
     std::wstring status = g_phoneList.empty()
-        ? L"Связь с телефоном активна"
+        ? L"Центр уведомлений активен (Связь с телефоном / Мессенджеры)"
         : (L"Уведомления: " + std::to_wstring(g_phoneList.size()));
     D2D1_RECT_F sr = D2D1::RectF(left + 18.0f, top + 40.0f, right - 100.0f, top + 62.0f);
     g_pRT->DrawText(status.c_str(), static_cast<UINT32>(status.size()), g_pTextFormatLeftSub, sr, g_pBrushTextMuted);
@@ -117,7 +123,7 @@ inline void DrawPhoneTab(float left, float top, float right, const POINT& mp) {
         g_pRT->FillRoundedRectangle(zoneRR, g_pBrushInputBg);
         g_pRT->DrawRoundedRectangle(zoneRR, g_pBrushBorder, 1.0f);
 
-        const wchar_t* emptyMsg = L"Новых уведомлений нет\nСообщения и звонки со смартфона появятся здесь";
+        const wchar_t* emptyMsg = L"Новых уведомлений нет\nПуши из exteraGram, Telegram и «Связь с телефоном» появятся здесь";
         D2D1_RECT_F tr = D2D1::RectF(zone.left + 16.0f, zone.top + 20.0f, zone.right - 16.0f, zone.bottom - 20.0f);
         g_pRT->DrawText(emptyMsg, static_cast<UINT32>(wcslen(emptyMsg)), g_pTextFormatSub, tr, g_pBrushTextMuted);
         return;
@@ -142,15 +148,19 @@ inline void DrawPhoneTab(float left, float top, float right, const POINT& mp) {
         D2D1_RECT_F timeRect = D2D1::RectF(card.right - 68.0f, card.top + 5.0f, card.right - 32.0f, card.top + 23.0f);
         g_pRT->DrawText(it.timeStr.c_str(), static_cast<UINT32>(it.timeStr.size()), g_pTextFormatTime, timeRect, g_pBrushTextMuted);
 
+        std::wstring fullTitle = (!it.appName.empty() && it.appName != it.title)
+            ? (it.appName + L" · " + it.title)
+            : it.title;
+
         D2D1_RECT_F titleRect = D2D1::RectF(card.left + 48.0f, card.top + 4.0f, card.right - 72.0f, card.top + 25.0f);
         D2D1_RECT_F bodyRect = D2D1::RectF(card.left + 48.0f, card.top + 24.0f, card.right - 34.0f, card.bottom - 4.0f);
 
         if (hot) {
-            DrawScrollingText(SLOT_TITLE, it.title, g_pTextFormatLeftTitle, titleRect, g_pBrushText);
+            DrawScrollingText(SLOT_TITLE, fullTitle, g_pTextFormatLeftTitle, titleRect, g_pBrushText);
             DrawScrollingText(SLOT_ARTIST, it.body, g_pTextFormatLeftSub, bodyRect, g_pBrushTextMuted);
         }
         else {
-            DrawClippedText(it.title, g_pTextFormatLeftTitle, titleRect, g_pBrushText);
+            DrawClippedText(fullTitle, g_pTextFormatLeftTitle, titleRect, g_pBrushText);
             DrawClippedText(it.body, g_pTextFormatLeftSub, bodyRect, g_pBrushTextMuted);
         }
 
@@ -166,6 +176,11 @@ using namespace winrt;
 using namespace Windows::UI::Notifications;
 using namespace Windows::UI::Notifications::Management;
 
+struct SeenToastRecord {
+    uint32_t id = 0;
+    std::wstring contentSignature;
+};
+
 inline void StartPhoneListener(HWND hwnd) {
     std::thread([hwnd]() {
         try {
@@ -178,75 +193,130 @@ inline void StartPhoneListener(HWND hwnd) {
                 return;
             }
 
-            std::vector<uint32_t> seenIds;
+            std::vector<SeenToastRecord> seenToasts;
             bool firstPass = true;
 
             while (g_running) {
-                auto notifications = listener.GetNotificationsAsync(NotificationKinds::Toast).get();
+                try {
+                    auto notifications = listener.GetNotificationsAsync(NotificationKinds::Toast).get();
 
-                for (const auto& n : notifications) {
-                    uint32_t id = n.Id();
-                    if (std::find(seenIds.begin(), seenIds.end(), id) != seenIds.end()) {
-                        continue;
-                    }
-                    seenIds.push_back(id);
+                    for (const auto& n : notifications) {
+                        uint32_t id = n.Id();
 
-                    std::wstring appDisplayName = L"";
-                    try {
-                        appDisplayName = n.AppInfo().DisplayInfo().DisplayName().c_str();
-                    }
-                    catch (...) {}
+                        // 1. Безопасно извлекаем имя приложения (некоторые Win32-приложения вроде exteraGram
+                        // или кастомных клиентов могут не иметь стандартного UWP AppInfo и выбрасывать исключение)
+                        std::wstring appDisplayName = L"";
+                        try {
+                            auto appInfo = n.AppInfo();
+                            if (appInfo) {
+                                appDisplayName = appInfo.DisplayInfo().DisplayName().c_str();
+                            }
+                        }
+                        catch (...) {}
 
-                    if (appDisplayName.find(L"Связь с телефоном") != std::wstring::npos ||
-                        appDisplayName.find(L"Phone Link") != std::wstring::npos ||
-                        appDisplayName.find(L"Ваш телефон") != std::wstring::npos) {
-
+                        // 2. Извлекаем ВСЕ текстовые строки уведомления (в Связи с телефоном и мессенджерах
+                        // их часто 3 или 4: название клиента -> имя чата -> текст сообщения)
                         NotificationBinding binding = n.Notification().Visual().GetBinding(KnownNotificationBindings::ToastGeneric());
-                        if (binding) {
-                            auto textElements = binding.GetTextElements();
-                            std::wstring titleText = L"";
-                            std::wstring bodyText = L"";
+                        if (!binding) continue;
 
-                            auto it = textElements.First();
-                            if (it.HasCurrent()) {
-                                titleText = it.Current().Text().c_str();
-                                it.MoveNext();
+                        std::vector<std::wstring> lines;
+                        for (const auto& el : binding.GetTextElements()) {
+                            std::wstring t = el.Text().c_str();
+                            if (!t.empty()) lines.push_back(t);
+                        }
+                        if (lines.empty()) continue;
+
+                        std::wstring titleText = lines[0];
+                        std::wstring bodyText = L"";
+
+                        if (lines.size() == 2) {
+                            bodyText = lines[1];
+                        }
+                        else if (lines.size() >= 3) {
+                            // Если 3+ строки (например, Phone Link: [0]="exteraGram", [1]="Имя контакта", [2]="Текст")
+                            if (appDisplayName.find(L"Связь с телефоном") != std::wstring::npos ||
+                                appDisplayName.find(L"Phone Link") != std::wstring::npos ||
+                                appDisplayName.find(L"Ваш телефон") != std::wstring::npos) {
+                                appDisplayName = lines[0];
+                                titleText = lines[1];
+                                for (size_t i = 2; i < lines.size(); ++i) {
+                                    if (!bodyText.empty()) bodyText += L" ";
+                                    bodyText += lines[i];
+                                }
                             }
-                            if (it.HasCurrent()) {
-                                bodyText = it.Current().Text().c_str();
+                            else {
+                                titleText = lines[0] + L" — " + lines[1];
+                                for (size_t i = 2; i < lines.size(); ++i) {
+                                    if (!bodyText.empty()) bodyText += L" ";
+                                    bodyText += lines[i];
+                                }
                             }
+                        }
 
-                            if (titleText.empty() && bodyText.empty()) continue;
+                        // Игнорируем системные уведомления самой ОС (Безопасность, Центр обновления и т.д.)
+                        std::wstring lowApp = appDisplayName;
+                        for (auto& c : lowApp) c = towlower(c);
+                        if (lowApp.find(L"безопасность windows") != std::wstring::npos ||
+                            lowApp.find(L"windows security") != std::wstring::npos ||
+                            lowApp.find(L"параметры") != std::wstring::npos) {
+                            continue;
+                        }
 
-                            bool isCall = false;
-                            std::wstring lowTitle = titleText;
-                            std::wstring lowBody = bodyText;
-                            for (auto& c : lowTitle) c = towlower(c);
-                            for (auto& c : lowBody) c = towlower(c);
-
-                            if (lowTitle.find(L"вызов") != std::wstring::npos ||
-                                lowTitle.find(L"звонок") != std::wstring::npos ||
-                                lowTitle.find(L"calling") != std::wstring::npos ||
-                                lowBody.find(L"входящий") != std::wstring::npos ||
-                                lowBody.find(L"incoming") != std::wstring::npos) {
-                                isCall = true;
+                        // 3. Проверяем по подписи текста (ID + Заголовок + Текст), чтобы ловить обновления
+                        // уведомлений с тем же ID, когда в один чат приходит несколько сообщений подряд
+                        std::wstring sig = titleText + L"|" + bodyText;
+                        bool alreadyProcessed = false;
+                        for (auto& rec : seenToasts) {
+                            if (rec.id == id) {
+                                if (rec.contentSignature == sig) {
+                                    alreadyProcessed = true;
+                                }
+                                else {
+                                    rec.contentSignature = sig; // Текст обновился — показываем новое сообщение!
+                                }
+                                break;
                             }
+                        }
+                        if (alreadyProcessed) continue;
 
-                            auto* item = new PhoneNotifItem();
-                            item->id = id;
-                            item->isCall = isCall;
-                            item->showPopup = !firstPass;
-                            item->appName = appDisplayName;
-                            item->title = titleText.empty() ? L"Уведомление" : titleText;
-                            item->body = bodyText;
-                            item->timeStr = GetClockString();
+                        bool idFound = false;
+                        for (const auto& rec : seenToasts) {
+                            if (rec.id == id) { idFound = true; break; }
+                        }
+                        if (!idFound) {
+                            seenToasts.push_back({ id, sig });
+                            if (seenToasts.size() > 150) seenToasts.erase(seenToasts.begin());
+                        }
 
-                            if (!PostMessage(hwnd, WM_PHONE_NOTIFICATION, 0, reinterpret_cast<LPARAM>(item))) {
-                                delete item;
-                            }
+                        bool isCall = false;
+                        std::wstring lowTitle = titleText;
+                        std::wstring lowBody = bodyText;
+                        for (auto& c : lowTitle) c = towlower(c);
+                        for (auto& c : lowBody) c = towlower(c);
+
+                        if (lowTitle.find(L"вызов") != std::wstring::npos ||
+                            lowTitle.find(L"звонок") != std::wstring::npos ||
+                            lowTitle.find(L"calling") != std::wstring::npos ||
+                            lowBody.find(L"входящий вызов") != std::wstring::npos ||
+                            lowBody.find(L"incoming call") != std::wstring::npos) {
+                            isCall = true;
+                        }
+
+                        auto* item = new PhoneNotifItem();
+                        item->id = id;
+                        item->isCall = isCall;
+                        item->showPopup = !firstPass;
+                        item->appName = appDisplayName;
+                        item->title = titleText.empty() ? L"Уведомление" : titleText;
+                        item->body = bodyText;
+                        item->timeStr = GetClockString();
+
+                        if (!PostMessage(hwnd, WM_PHONE_NOTIFICATION, 0, reinterpret_cast<LPARAM>(item))) {
+                            delete item;
                         }
                     }
                 }
+                catch (...) {}
 
                 firstPass = false;
                 Sleep(250);

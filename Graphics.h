@@ -324,11 +324,42 @@ inline ID2D1PathGeometry* BuildDockedGeometry(float left, float top, float right
 inline void DrawIslandCapsule(float left, float top, float right, float bottom, float radius) {
     ApplyConfigBrushes();
 
+    // 1. Внешнее неоновое свечение (Ambient Glow) вокруг капсулы
+    if (g_cfg.fxAmbientGlow) {
+        float glowPower = (g_extras.smoothLevel > 0.02f) ? (0.20f + g_extras.smoothLevel * 0.48f) : 0.12f;
+        COLORREF glowRef = GetActiveAccentRef();
+        for (int layer = 3; layer >= 1; --layer) {
+            float expand = layer * 2.6f + g_extras.smoothLevel * 3.8f;
+            float alpha = (glowPower / layer) * 0.40f;
+            float gTop = g_cfg.dockToTop ? top : (top - expand * 0.6f);
+            D2D1_RECT_F gr = D2D1::RectF(left - expand, gTop, right + expand, bottom + expand * 0.8f);
+            FillRR(gr, radius + expand, ColorFromRef(glowRef, alpha));
+        }
+    }
+
+    // Вспомогательная лямбда для создания градиентной кисти 3D-стекла
+    auto createGlassRimBrush = [&]() -> ID2D1LinearGradientBrush* {
+        if (!g_cfg.fxGlassRim) return nullptr;
+        D2D1_GRADIENT_STOP stops[3] = {
+            { 0.0f, D2D1::ColorF(1.0f, 1.0f, 1.0f, 0.36f) },
+            { 0.45f, ColorFromRef(GetActiveAccentRef(), 0.18f) },
+            { 1.0f, D2D1::ColorF(1.0f, 1.0f, 1.0f, 0.04f) }
+        };
+        ID2D1GradientStopCollection* pStops = nullptr;
+        ID2D1LinearGradientBrush* pRim = nullptr;
+        if (SUCCEEDED(g_pRT->CreateGradientStopCollection(stops, 3, &pStops))) {
+            D2D1_LINEAR_GRADIENT_BRUSH_PROPERTIES props = D2D1::LinearGradientBrushProperties(
+                D2D1::Point2F(left, top), D2D1::Point2F(left, bottom));
+            g_pRT->CreateLinearGradientBrush(props, pStops, &pRim);
+            pStops->Release();
+        }
+        return pRim;
+        };
+
     if (!g_cfg.dockToTop) {
         D2D1_ROUNDED_RECT capsule = D2D1::RoundedRect(D2D1::RectF(left, top, right, bottom), radius, radius);
         g_pRT->FillRoundedRectangle(capsule, g_pBrushBg);
 
-        // Обрезаем круги битов строго по скругленной геометрии парящего островка
         if (g_cfg.beatCirclesMode != 0 && (g_extras.smoothLevel >= 0.01f || !g_extras.beatRings.empty())) {
             ID2D1RoundedRectangleGeometry* pRoundGeo = nullptr;
             ID2D1Layer* pLayer = nullptr;
@@ -342,7 +373,13 @@ inline void DrawIslandCapsule(float left, float top, float right, float bottom, 
             if (pRoundGeo) pRoundGeo->Release();
         }
 
-        g_pRT->DrawRoundedRectangle(capsule, g_pBrushBorder, 1.0f);
+        if (ID2D1LinearGradientBrush* pRim = createGlassRimBrush()) {
+            g_pRT->DrawRoundedRectangle(capsule, pRim, 1.3f);
+            pRim->Release();
+        }
+        else {
+            g_pRT->DrawRoundedRectangle(capsule, g_pBrushBorder, 1.0f);
+        }
         return;
     }
 
@@ -352,7 +389,6 @@ inline void DrawIslandCapsule(float left, float top, float right, float bottom, 
     if (pFillGeo) {
         g_pRT->FillGeometry(pFillGeo, g_pBrushBg);
 
-        // Обрезаем круги битов строго по контуру прилипающей капсулы
         if (g_cfg.beatCirclesMode != 0 && (g_extras.smoothLevel >= 0.01f || !g_extras.beatRings.empty())) {
             ID2D1Layer* pLayer = nullptr;
             if (SUCCEEDED(g_pRT->CreateLayer(&pLayer))) {
@@ -366,7 +402,13 @@ inline void DrawIslandCapsule(float left, float top, float right, float bottom, 
     }
 
     if (pBorderGeo) {
-        g_pRT->DrawGeometry(pBorderGeo, g_pBrushBorder, 1.0f);
+        if (ID2D1LinearGradientBrush* pRim = createGlassRimBrush()) {
+            g_pRT->DrawGeometry(pBorderGeo, pRim, 1.3f);
+            pRim->Release();
+        }
+        else {
+            g_pRT->DrawGeometry(pBorderGeo, g_pBrushBorder, 1.0f);
+        }
         pBorderGeo->Release();
     }
 }

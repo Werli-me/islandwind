@@ -740,6 +740,16 @@ inline void DrawMediaTransportButtons(const D2D1_RECT_F& prevRect, const D2D1_RE
 }
 
 inline void DrawMusicTab(float left, float top, float right, double livePos, const LyricView& curLyric, const POINT& mp) {
+    // Атмосферный фон из обложки трека (Vinyl Backdrop)
+    if (g_cfg.fxVinylBackdrop && g_pAlbumBitmap) {
+        D2D1_RECT_F bgRect = D2D1::RectF(left + 4.0f, top + 36.0f, right - 4.0f, top + g_state.curH - 4.0f);
+        g_pRT->PushAxisAlignedClip(bgRect, D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
+        D2D1_RECT_F stretchR = D2D1::RectF(left - 20.0f, top - 40.0f, right + 20.0f, top + g_state.curH + 40.0f);
+        g_pRT->DrawBitmap(g_pAlbumBitmap, stretchR, 0.15f, D2D1_BITMAP_INTERPOLATION_MODE_LINEAR);
+        FillRR(bgRect, 14.0f, D2D1::ColorF(0.0f, 0.0f, 0.0f, 0.32f));
+        g_pRT->PopAxisAlignedClip();
+    }
+
     D2D1_RECT_F coverRect = GetCoverRect();
     D2D1_ROUNDED_RECT coverRound = D2D1::RoundedRect(coverRect, 14.0f, 14.0f);
     g_pRT->FillRoundedRectangle(coverRound, g_pBrushInputBg);

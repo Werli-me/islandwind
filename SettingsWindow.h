@@ -5,12 +5,13 @@
 #include "MusicTab.h"
 #include "ShelfTab.h"
 
+void SaveExtraTabsData();
+
 constexpr int CFG_W = 860;
 constexpr int CFG_H = 650;
 constexpr float SIDEBAR_W = 216.0f;
 
 inline ID2D1HwndRenderTarget* g_pCfgRT = nullptr;
-// 0=Остров, 1=Внешний вид, 2=Музыка, 3=Игровой режим, 4=Уведомления, 5=Вкладки, 6=Питомец, 7=Система
 inline int g_cfgPage = 0;
 inline int g_cfgDragSlider = -1;
 inline int g_cfgDragTabRow = -1;
@@ -57,8 +58,8 @@ inline D2D1_RECT_F SidebarItemRect(int i) {
 inline D2D1_RECT_F TabOrderRowRect(int rowIdx) {
     float CL = SIDEBAR_W + 34.0f;
     float CR = CFG_W - 34.0f;
-    float y = 72.0f + rowIdx * 38.0f;
-    return D2D1::RectF(CL + 12.0f, y, CR - 12.0f, y + 34.0f);
+    float y = 66.0f + rowIdx * 34.0f;
+    return D2D1::RectF(CL + 12.0f, y, CR - 12.0f, y + 31.0f);
 }
 
 inline void AddHit(int id, const D2D1_RECT_F& r) {
@@ -90,19 +91,19 @@ inline void RenderSettingsWindow(HWND hwnd) {
     auto fillRR = [&](const D2D1_RECT_F& r, float rad, D2D1_COLOR_F c) {
         br->SetColor(c);
         g_pCfgRT->FillRoundedRectangle(D2D1::RoundedRect(r, rad, rad), br);
-        };
+    };
     auto drawRR = [&](const D2D1_RECT_F& r, float rad, D2D1_COLOR_F c, float w = 1.0f) {
         br->SetColor(c);
         g_pCfgRT->DrawRoundedRectangle(D2D1::RoundedRect(r, rad, rad), br, w);
-        };
+    };
     auto drawLine = [&](float x1, float y1, float x2, float y2, D2D1_COLOR_F c) {
         br->SetColor(c);
         g_pCfgRT->DrawLine(D2D1::Point2F(x1, y1), D2D1::Point2F(x2, y2), br, 1.0f);
-        };
+    };
     auto drawText = [&](const std::wstring& txt, IDWriteTextFormat* fmt, const D2D1_RECT_F& r, D2D1_COLOR_F c) {
         br->SetColor(c);
         g_pCfgRT->DrawText(txt.c_str(), (UINT32)txt.size(), fmt, r, br);
-        };
+    };
 
     D2D1_COLOR_F cText = D2D1::ColorF(0.95f, 0.96f, 0.98f);
     D2D1_COLOR_F cMuted = D2D1::ColorF(0.56f, 0.58f, 0.64f);
@@ -174,7 +175,7 @@ inline void RenderSettingsWindow(HWND hwnd) {
         D2D1_RECT_F ib = D2D1::RectF(x, y, x + 32.0f, y + 32.0f);
         fillRR(ib, 8.0f, D2D1::ColorF(1, 1, 1, 0.05f));
         drawText(iconStr, g_pTextFormatSub, ib, cMuted);
-        };
+    };
 
     auto drawPillChoice = [&](int hitId, float x, float y, float w, const wchar_t* label, bool selected) {
         D2D1_RECT_F pr = D2D1::RectF(x, y, x + w, y + 30.0f);
@@ -183,7 +184,7 @@ inline void RenderSettingsWindow(HWND hwnd) {
         if (selected) drawRR(pr, 15.0f, cAccent, 1.5f);
         drawText(label, g_pTextFormatTime, pr, cText);
         AddHit(hitId, pr);
-        };
+    };
 
     auto drawSwitch = [&](int hitId, float rightX, float centerY, bool on) {
         D2D1_RECT_F sw = D2D1::RectF(rightX - 44.0f, centerY - 12.0f, rightX, centerY + 12.0f);
@@ -192,7 +193,7 @@ inline void RenderSettingsWindow(HWND hwnd) {
         br->SetColor(cText);
         g_pCfgRT->FillEllipse(D2D1::Ellipse(D2D1::Point2F(kx, centerY), 8.5f, 8.5f), br);
         AddHit(hitId, sw);
-        };
+    };
 
     auto drawSliderControl = [&](int sliderId, float leftX, float rightX, float centerY, float norm, const std::wstring& valStr) {
         D2D1_RECT_F hitR = D2D1::RectF(leftX, centerY - 10.0f, rightX - 58.0f, centerY + 10.0f);
@@ -207,7 +208,7 @@ inline void RenderSettingsWindow(HWND hwnd) {
         g_pCfgRT->FillEllipse(D2D1::Ellipse(D2D1::Point2F(fx, centerY), 8.0f, 8.0f), br);
         drawText(valStr, g_pTextFormatRightSub, D2D1::RectF(hitR.right + 6.0f, centerY - 12.0f, rightX, centerY + 12.0f), cMuted);
         AddHit(sliderId, hitR);
-        };
+    };
 
     // ---------------- СТРАНИЦА 0: ОСТРОВ ----------------
     if (g_cfgPage == 0) {
@@ -272,7 +273,7 @@ inline void RenderSettingsWindow(HWND hwnd) {
 
         drawIconBadge(CL + 18, 472, L"\u25A3");
         drawText(L"Режим", g_pTextFormatLeftTitle, D2D1::RectF(CL + 64, 460, CR - 20, 480), cText);
-        drawText(L"Мини: часы и погода. Caps Lock и громкость появляются сбоку по необходимости", g_pTextFormatSmallMuted, D2D1::RectF(CL + 64, 480, CR - 20, 498), cMuted);
+        drawText(L"Мини: часы и погода. Микрофон, Caps Lock и громкость появляются сбоку по необходимости", g_pTextFormatSmallMuted, D2D1::RectF(CL + 64, 480, CR - 20, 498), cMuted);
         drawPillChoice(106, CL + 64, 502, 86, L"Обычный", !g_cfg.minimalCompact);
         drawPillChoice(107, CL + 158, 502, 108, L"Мини-остров", g_cfg.minimalCompact);
 
@@ -313,8 +314,8 @@ inline void RenderSettingsWindow(HWND hwnd) {
         }
         drawPillChoice(220, CL + 324, 212, 118, L"Свой RGB...", false);
 
-        drawText(L"Размеры и позиция на экране", g_pTextFormatSmallMuted, D2D1::RectF(CL + 2, 280, CR, 298), cMuted);
-        D2D1_RECT_F card2 = D2D1::RectF(CL, 304, CR, 576);
+        drawText(L"Размеры, позиция и визуальные эффекты", g_pTextFormatSmallMuted, D2D1::RectF(CL + 2, 276, CR, 294), cMuted);
+        D2D1_RECT_F card2 = D2D1::RectF(CL, 298, CR, 638);
         fillRR(card2, 14.0f, cCard);
         drawRR(card2, 14.0f, cBorder);
 
@@ -328,18 +329,26 @@ inline void RenderSettingsWindow(HWND hwnd) {
             std::wstring val;
         } rows[5] = {
             { 501, L"Позиция по горизонтали (или Alt + ЛКМ)", (g_cfg.offsetX + halfRange) / (2.0f * halfRange), std::to_wstring(g_cfg.offsetX) + L" px" },
-            { 502, L"Ширина раскрытого острова", (g_cfg.expandedW - 360.0f) / 140.0f, std::to_wstring((int)g_cfg.expandedW) + L" px" },
+            { 502, L"Ширина раскрытого острова", (g_cfg.expandedW - 360.0f) / 160.0f, std::to_wstring((int)g_cfg.expandedW) + L" px" },
             { 503, L"Ширина свёрнутого острова", (g_cfg.compactW - 114.0f) / 126.0f, std::to_wstring((int)g_cfg.compactW) + L" px" },
             { 504, L"Непрозрачность фона", (g_cfg.bgOpacity - 0.40f) / 0.60f, std::to_wstring((int)std::round(g_cfg.bgOpacity * 100)) + L"%" },
             { 505, L"Скорость анимации", (g_cfg.animSpeed - 0.08f) / 0.32f, std::to_wstring((int)std::round(g_cfg.animSpeed * 100)) + L"%" }
         };
 
         for (int i = 0; i < 5; ++i) {
-            float ry = 330.0f + i * 48.0f;
+            float ry = 322.0f + i * 44.0f;
             drawText(rows[i].title, g_pTextFormatLeftSub, D2D1::RectF(CL + 22, ry - 12, CL + 280, ry + 12), cText);
             drawSliderControl(rows[i].id, CL + 290, CR - 18, ry, rows[i].norm, rows[i].val);
-            if (i < 4) drawLine(CL + 18, ry + 24, CR - 18, ry + 24, cBorder);
+            drawLine(CL + 18, ry + 22, CR - 18, ry + 22, cBorder);
         }
+
+        // Тумблеры визуальных эффектов Pro
+        drawText(L"Визуальные эффекты Pro:", g_pTextFormatLeftSub, D2D1::RectF(CL + 22, 526, CR - 20, 546), cMuted);
+        drawPillChoice(910, CL + 22, 552, 118, L"Пружина UI", g_cfg.fxSpringPhysics);
+        drawPillChoice(911, CL + 148, 552, 128, L"Неон-свечение", g_cfg.fxAmbientGlow);
+        drawPillChoice(912, CL + 284, 552, 124, L"3D-блик стекла", g_cfg.fxGlassRim);
+        drawPillChoice(913, CL + 22, 590, 134, L"Плавные вкладки", g_cfg.fxSmoothTabs);
+        drawPillChoice(914, CL + 164, 590, 148, L"Фон-обложка плеера", g_cfg.fxVinylBackdrop);
     }
 
     // ---------------- СТРАНИЦА 2: МУЗЫКА ----------------
@@ -391,7 +400,6 @@ inline void RenderSettingsWindow(HWND hwnd) {
         fillRR(card1, 14.0f, cCard);
         drawRR(card1, 14.0f, cBorder);
 
-        // 1. Включить Игровой HUD
         drawIconBadge(CL + 18, 100, L"\U0001F3AE");
         drawText(L"Активный Игровой режим (Alt + G)", g_pTextFormatLeftTitle, D2D1::RectF(CL + 64, 92, CR - 80, 114), cText);
         drawText(L"Превращает свёрнутый остров в компактную игровую панель с датчиками", g_pTextFormatSmallMuted, D2D1::RectF(CL + 64, 112, CR - 80, 132), cMuted);
@@ -399,7 +407,6 @@ inline void RenderSettingsWindow(HWND hwnd) {
 
         drawLine(CL + 18, 146, CR - 18, 146, cBorder);
 
-        // 2. Поведение при запуске полноэкранной игры
         drawIconBadge(CL + 18, 168, L"\U0001F5A5");
         drawText(L"При запуске полноэкранной игры", g_pTextFormatLeftTitle, D2D1::RectF(CL + 64, 156, CR - 20, 178), cText);
         drawText(L"Как вести себя острову, когда открыта 3D-игра во весь экран", g_pTextFormatSmallMuted, D2D1::RectF(CL + 64, 176, CR - 20, 194), cMuted);
@@ -409,45 +416,46 @@ inline void RenderSettingsWindow(HWND hwnd) {
 
         drawLine(CL + 18, 242, CR - 18, 242, cBorder);
 
-        // 3. Прозрачность для кликов мыши (Click-Through)
         drawIconBadge(CL + 18, 262, L"\U0001F5B1");
         drawText(L"Пропускать клики сквозь свёрнутый HUD (Click-Through)", g_pTextFormatLeftTitle, D2D1::RectF(CL + 64, 254, CR - 80, 276), cText);
         drawText(L"В игре вы не заденете остров мышью. Зажмите Alt, чтобы кликнуть по острову", g_pTextFormatSmallMuted, D2D1::RectF(CL + 64, 274, CR - 80, 304), cMuted);
         drawSwitch(805, CR - 20, 276, g_cfg.gameClickThrough);
 
-        // Карточка выбора датчиков по важности
-        drawText(L"Датчики на компактной панели (По важности)", g_pTextFormatSmallMuted, D2D1::RectF(CL + 2, 332, CR, 350), cMuted);
+        drawText(L"Датчики на компактной панели (По важности)", g_pTextFormatSmallMuted, D2D1::RectF(CL + 2, 330, CR, 348), cMuted);
 
-        D2D1_RECT_F card2 = D2D1::RectF(CL, 356, CR, 610);
+        D2D1_RECT_F card2 = D2D1::RectF(CL, 352, CR, 634);
         fillRR(card2, 14.0f, cCard);
         drawRR(card2, 14.0f, cBorder);
 
-        drawIconBadge(CL + 18, 376, L"\u26A1");
-        drawText(L"Выберите показатели для вывода в Игровом HUD", g_pTextFormatLeftTitle, D2D1::RectF(CL + 64, 368, CR - 20, 390), cText);
-        drawText(L"Остров сам подстроит ширину и подсветит критические значения цветом", g_pTextFormatSmallMuted, D2D1::RectF(CL + 64, 388, CR - 20, 408), cMuted);
+        drawIconBadge(CL + 18, 370, L"\u26A1");
+        drawText(L"Выберите показатели для вывода в Игровом HUD", g_pTextFormatLeftTitle, D2D1::RectF(CL + 64, 362, CR - 20, 384), cText);
+        drawText(L"Остров сам подстроит ширину и подсветит критические значения цветом", g_pTextFormatSmallMuted, D2D1::RectF(CL + 64, 382, CR - 20, 402), cMuted);
 
-        // Ряд 1 пилюль датчиков
-        drawPillChoice(810, CL + 64, 420, 108, L"FPS (Кадры/с)", g_cfg.hudShowFps);
-        drawPillChoice(811, CL + 180, 420, 144, L"Время кадра (мс)", g_cfg.hudShowFrameTime);
-        drawPillChoice(812, CL + 332, 420, 114, L"Процессор CPU", g_cfg.hudShowCpu);
+        drawPillChoice(810, CL + 64, 408, 108, L"FPS (Кадры/с)", g_cfg.hudShowFps);
+        drawPillChoice(811, CL + 180, 408, 144, L"Время кадра (мс)", g_cfg.hudShowFrameTime);
+        drawPillChoice(812, CL + 332, 408, 114, L"Процессор CPU", g_cfg.hudShowCpu);
 
-        // Ряд 2 пилюль датчиков
-        drawPillChoice(813, CL + 64, 460, 122, L"Видеокарта GPU", g_cfg.hudShowGpu);
-        drawPillChoice(814, CL + 194, 460, 142, L"Видеопамять VRAM", g_cfg.hudShowVram);
-        drawPillChoice(815, CL + 344, 460, 116, L"Память ОЗУ %", g_cfg.hudShowRam);
+        drawPillChoice(813, CL + 64, 444, 122, L"Видеокарта GPU", g_cfg.hudShowGpu);
+        drawPillChoice(814, CL + 194, 444, 142, L"Видеопамять VRAM", g_cfg.hudShowVram);
+        drawPillChoice(815, CL + 344, 444, 116, L"Память ОЗУ %", g_cfg.hudShowRam);
 
-        // Ряд 3 пилюль датчиков
-        drawPillChoice(816, CL + 64, 500, 134, L"Сетевой Пинг (мс)", g_cfg.hudShowPing);
-        drawPillChoice(817, CL + 206, 500, 136, L"Таймер сессии \u23F1", g_cfg.hudShowTimer);
+        drawPillChoice(816, CL + 64, 480, 134, L"Сетевой Пинг (мс)", g_cfg.hudShowPing);
+        drawPillChoice(817, CL + 206, 480, 136, L"Таймер сессии \u23F1", g_cfg.hudShowTimer);
 
-        drawLine(CL + 18, 544, CR - 18, 544, cBorder);
+        drawLine(CL + 18, 520, CR - 18, 520, cBorder);
 
-        // Кнопка быстрой очистки ОЗУ прямо из настроек
-        drawIconBadge(CL + 18, 560, L"\U0001F680");
-        std::wstring ramInfo = L"Занято ОЗУ: " + std::to_wstring(g_game.ramPct.load()) + L"%  ·  Пинг: " + std::to_wstring(g_game.pingMs.load()) + L" мс";
-        drawText(ramInfo, g_pTextFormatLeftTitle, D2D1::RectF(CL + 64, 554, CL + 340, 576), cText);
-        drawText(L"Освободить кэш фоновых программ перед запуском игры", g_pTextFormatSmallMuted, D2D1::RectF(CL + 64, 574, CL + 360, 596), cMuted);
-        drawPillChoice(820, CR - 156, 562, 138, L"Очистить ОЗУ", false);
+        drawIconBadge(CL + 18, 534, L"\U0001F310");
+        drawText(L"Узел проверки пинга:", g_pTextFormatLeftSub, D2D1::RectF(CL + 64, 526, CR - 20, 546), cMuted);
+        drawPillChoice(830, CL + 64, 548, 112, L"РФ (Яндекс)", g_cfg.pingTarget == 0);
+        drawPillChoice(831, CL + 182, 548, 136, L"Стокгольм (Valve)", g_cfg.pingTarget == 1);
+        drawPillChoice(832, CL + 324, 548, 114, L"Европа (1.1.1.1)", g_cfg.pingTarget == 2);
+        drawPillChoice(833, CL + 444, 548, 112, L"Google (8.8.8.8)", g_cfg.pingTarget == 3);
+
+        drawLine(CL + 18, 586, CR - 18, 586, cBorder);
+
+        std::wstring ramInfo = L"Занято ОЗУ: " + std::to_wstring(g_game.ramPct.load()) + L"%  ·  Текущий пинг: " + std::to_wstring(g_game.pingMs.load()) + L" мс";
+        drawText(ramInfo, g_pTextFormatLeftTitle, D2D1::RectF(CL + 22, 596, CL + 380, 624), cText);
+        drawPillChoice(820, CR - 156, 595, 138, L"Очистить ОЗУ", false);
     }
 
     // ---------------- СТРАНИЦА 4: УВЕДОМЛЕНИЯ ----------------
@@ -476,7 +484,7 @@ inline void RenderSettingsWindow(HWND hwnd) {
     else if (g_cfgPage == 5) {
         drawText(L"Вкладки", g_pTextFormatHeader, D2D1::RectF(CL, 14, CR, 44), cText);
 
-        D2D1_RECT_F listCard = D2D1::RectF(CL, 62, CR, 382);
+        D2D1_RECT_F listCard = D2D1::RectF(CL, 58, CR, 378);
         fillRR(listCard, 14.0f, cCard);
         drawRR(listCard, 14.0f, cBorder);
 
@@ -505,7 +513,7 @@ inline void RenderSettingsWindow(HWND hwnd) {
                 D2D1::RectF(row.right - 36.0f, cy - 12.0f, row.right - 8.0f, cy + 12.0f), cMuted);
         }
 
-        D2D1_RECT_F rstOrder = D2D1::RectF(CL + 22.0f, 344.0f, CL + 168.0f, 374.0f);
+        D2D1_RECT_F rstOrder = D2D1::RectF(CL + 22.0f, 342.0f, CL + 168.0f, 370.0f);
         bool hotRst = PtInRectF(rstOrder, mp.x, mp.y);
         if (hotRst) fillRR(rstOrder, 7.0f, D2D1::ColorF(1, 1, 1, 0.07f));
         drawText(L"Сбросить порядок", g_pTextFormatLeftSub, D2D1::RectF(rstOrder.left + 6.0f, rstOrder.top, rstOrder.right, rstOrder.bottom),
@@ -513,27 +521,27 @@ inline void RenderSettingsWindow(HWND hwnd) {
         AddHit(750, rstOrder);
 
         drawText(L"Порядок: тяните за \u2261 или зажмите вкладку на острове. «Плеер» всегда на первом месте.",
-            g_pTextFormatSmallMuted, D2D1::RectF(CL + 2, 388, CR, 412), cMuted);
+            g_pTextFormatSmallMuted, D2D1::RectF(CL + 2, 386, CR, 410), cMuted);
 
-        D2D1_RECT_F badgeCard = D2D1::RectF(CL, 418, CR, 492);
+        D2D1_RECT_F badgeCard = D2D1::RectF(CL, 416, CR, 490);
         fillRR(badgeCard, 14.0f, cCard);
         drawRR(badgeCard, 14.0f, cBorder);
-        drawIconBadge(CL + 18, 438, L"\U0001F514");
-        drawText(L"Отметки на вкладках", g_pTextFormatLeftTitle, D2D1::RectF(CL + 64, 428, CR - 80, 450), cText);
-        drawText(L"Красная точка или число, если что-то ждёт: уведомления, записи буфера, событие календаря",
-            g_pTextFormatSmallMuted, D2D1::RectF(CL + 64, 450, CR - 80, 480), cMuted);
-        drawSwitch(751, CR - 20, 454, g_cfg.showTabBadges);
+        drawIconBadge(CL + 18, 436, L"\U0001F514");
+        drawText(L"Отметки на вкладках", g_pTextFormatLeftTitle, D2D1::RectF(CL + 64, 426, CR - 80, 448), cText);
+        drawText(L"Красная точка или число, если что-то ждёт: мут микрофона, уведомления, событие календаря",
+            g_pTextFormatSmallMuted, D2D1::RectF(CL + 64, 448, CR - 80, 478), cMuted);
+        drawSwitch(751, CR - 20, 452, g_cfg.showTabBadges);
 
-        drawText(L"Буфер обмена", g_pTextFormatSmallMuted, D2D1::RectF(CL + 2, 502, CR, 520), cMuted);
+        drawText(L"Буфер обмена", g_pTextFormatSmallMuted, D2D1::RectF(CL + 2, 500, CR, 518), cMuted);
 
-        D2D1_RECT_F clipCard = D2D1::RectF(CL, 526, CR, 604);
+        D2D1_RECT_F clipCard = D2D1::RectF(CL, 524, CR, 602);
         fillRR(clipCard, 14.0f, cCard);
         drawRR(clipCard, 14.0f, cBorder);
-        drawIconBadge(CL + 18, 548, L"\u21BA");
-        drawText(L"Хранить историю после перезапуска", g_pTextFormatLeftTitle, D2D1::RectF(CL + 64, 536, CR - 80, 558), cText);
+        drawIconBadge(CL + 18, 546, L"\u21BA");
+        drawText(L"Хранить историю после перезапуска", g_pTextFormatLeftTitle, D2D1::RectF(CL + 64, 534, CR - 80, 556), cText);
         drawText(L"Тексты и ссылки сохраняются в папке данных между перезапусками программы",
-            g_pTextFormatSmallMuted, D2D1::RectF(CL + 64, 558, CR - 80, 590), cMuted);
-        drawSwitch(752, CR - 20, 564, g_cfg.persistClipboard);
+            g_pTextFormatSmallMuted, D2D1::RectF(CL + 64, 556, CR - 80, 588), cMuted);
+        drawSwitch(752, CR - 20, 562, g_cfg.persistClipboard);
     }
 
     // ---------------- СТРАНИЦА 6: ПИТОМЕЦ ----------------
@@ -559,36 +567,43 @@ inline void RenderSettingsWindow(HWND hwnd) {
         drawText(L"Система", g_pTextFormatHeader, D2D1::RectF(CL, 20, CR, 52), cText);
         drawText(L"Системные индикаторы и поведение в Windows", g_pTextFormatSmallMuted, D2D1::RectF(CL + 2, 62, CR, 80), cMuted);
 
-        D2D1_RECT_F card = D2D1::RectF(CL, 86, CR, 356);
+        D2D1_RECT_F card = D2D1::RectF(CL, 86, CR, 422);
         fillRR(card, 14.0f, cCard);
         drawRR(card, 14.0f, cBorder);
 
-        drawIconBadge(CL + 18, 106, L"A");
-        drawText(L"Индикатор Caps Lock", g_pTextFormatLeftTitle, D2D1::RectF(CL + 64, 98, CR - 80, 120), cText);
-        drawText(L"Показывать сбоку капсулы статус нажатия клавиши Caps Lock", g_pTextFormatSmallMuted, D2D1::RectF(CL + 64, 118, CR - 80, 138), cMuted);
-        drawSwitch(601, CR - 20, 118, g_cfg.capsLockAlert);
+        drawIconBadge(CL + 18, 106, L"\U0001F399");
+        drawText(L"Индикатор выключенного микрофона в капсуле", g_pTextFormatLeftTitle, D2D1::RectF(CL + 64, 98, CR - 80, 120), cText);
+        drawText(L"Показывать сбоку свёрнутого острова красный значок MIC OFF, когда микрофон в муте", g_pTextFormatSmallMuted, D2D1::RectF(CL + 64, 118, CR - 80, 138), cMuted);
+        drawSwitch(606, CR - 20, 118, g_cfg.showMicMuteCompact);
 
         drawLine(CL + 18, 152, CR - 18, 152, cBorder);
 
-        drawIconBadge(CL + 18, 172, L"\U0001F50A");
-        drawText(L"Громкость колесиком по свёрнутому острову", g_pTextFormatLeftTitle, D2D1::RectF(CL + 64, 164, CR - 80, 186), cText);
-        drawText(L"Менять системный звук прокруткой колеса мыши без раскрытия острова", g_pTextFormatSmallMuted, D2D1::RectF(CL + 64, 184, CR - 80, 204), cMuted);
-        drawSwitch(602, CR - 20, 184, g_cfg.wheelVolumeCompact);
+        drawIconBadge(CL + 18, 172, L"A");
+        drawText(L"Индикатор Caps Lock", g_pTextFormatLeftTitle, D2D1::RectF(CL + 64, 164, CR - 80, 186), cText);
+        drawText(L"Показывать сбоку капсулы статус нажатия клавиши Caps Lock", g_pTextFormatSmallMuted, D2D1::RectF(CL + 64, 184, CR - 80, 204), cMuted);
+        drawSwitch(601, CR - 20, 184, g_cfg.capsLockAlert);
 
         drawLine(CL + 18, 218, CR - 18, 218, cBorder);
 
-        drawIconBadge(CL + 18, 238, L"%");
-        drawText(L"Монитор нагрузки процессора (CPU)", g_pTextFormatLeftTitle, D2D1::RectF(CL + 64, 230, CR - 80, 252), cText);
-        drawText(L"Отображать процент загрузки CPU в обычном режиме капсулы", g_pTextFormatSmallMuted, D2D1::RectF(CL + 64, 250, CR - 80, 270), cMuted);
-        drawSwitch(603, CR - 20, 250, g_cfg.showCpuCompact);
+        drawIconBadge(CL + 18, 238, L"\U0001F50A");
+        drawText(L"Громкость колесиком по свёрнутому острову", g_pTextFormatLeftTitle, D2D1::RectF(CL + 64, 230, CR - 80, 252), cText);
+        drawText(L"Менять системный звук прокруткой колеса мыши без раскрытия острова", g_pTextFormatSmallMuted, D2D1::RectF(CL + 64, 250, CR - 80, 270), cMuted);
+        drawSwitch(602, CR - 20, 250, g_cfg.wheelVolumeCompact);
 
         drawLine(CL + 18, 284, CR - 18, 284, cBorder);
 
+        drawIconBadge(CL + 18, 304, L"%");
+        drawText(L"Монитор нагрузки процессора (CPU)", g_pTextFormatLeftTitle, D2D1::RectF(CL + 64, 296, CR - 80, 318), cText);
+        drawText(L"Отображать процент загрузки CPU в обычном режиме капсулы", g_pTextFormatSmallMuted, D2D1::RectF(CL + 64, 316, CR - 80, 336), cMuted);
+        drawSwitch(603, CR - 20, 316, g_cfg.showCpuCompact);
+
+        drawLine(CL + 18, 350, CR - 18, 350, cBorder);
+
         bool autoStart = IsAutoStartEnabled();
-        drawIconBadge(CL + 18, 304, L"\U0001F680");
-        drawText(L"Запускать вместе с Windows", g_pTextFormatLeftTitle, D2D1::RectF(CL + 64, 296, CR - 80, 318), cText);
-        drawText(L"Автоматический старт программы при входе в систему", g_pTextFormatSmallMuted, D2D1::RectF(CL + 64, 316, CR - 80, 336), cMuted);
-        drawSwitch(605, CR - 20, 316, autoStart);
+        drawIconBadge(CL + 18, 370, L"\U0001F680");
+        drawText(L"Запускать вместе с Windows", g_pTextFormatLeftTitle, D2D1::RectF(CL + 64, 362, CR - 80, 384), cText);
+        drawText(L"Автоматический старт программы при входе в систему", g_pTextFormatSmallMuted, D2D1::RectF(CL + 64, 382, CR - 80, 402), cMuted);
+        drawSwitch(605, CR - 20, 382, autoStart);
     }
 
     g_pCfgRT->EndDraw();
@@ -605,7 +620,7 @@ inline void HandleCfgSliderDrag(int sliderId, int mx) {
             switch (sliderId) {
             case 500: g_cfg.hoverDelayMs = static_cast<int>(std::round(t * 40.0f)) * 10; break;
             case 501: g_cfg.offsetX = static_cast<int>(std::round(-halfRange + t * (2.0f * halfRange))); break;
-            case 502: g_cfg.expandedW = std::round(360.0f + t * 140.0f); break;
+            case 502: g_cfg.expandedW = std::round(360.0f + t * 160.0f); break;
             case 503: g_cfg.compactW = std::round(114.0f + t * 126.0f); break;
             case 504: g_cfg.bgOpacity = 0.40f + t * 0.60f; break;
             case 505: g_cfg.animSpeed = 0.08f + t * 0.32f; break;
@@ -634,7 +649,7 @@ inline LRESULT CALLBACK SettingsWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPAR
             HandleCfgSliderDrag(g_cfgDragSlider, mx);
         }
         else if (g_cfgDragTabRow >= 0 && (wParam & MK_LBUTTON)) {
-            int targetRow = std::clamp(static_cast<int>((my - 72.0f) / 38.0f), 0, kCustomTabCount - 1);
+            int targetRow = std::clamp(static_cast<int>((my - 66.0f) / 34.0f), 0, kCustomTabCount - 1);
             if (targetRow != g_cfgDragTabRow) {
                 std::swap(g_cfg.tabOrder[g_cfgDragTabRow], g_cfg.tabOrder[targetRow]);
                 g_cfgDragTabRow = targetRow;
@@ -719,12 +734,12 @@ inline LRESULT CALLBACK SettingsWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPAR
                 case 602: g_cfg.wheelVolumeCompact = !g_cfg.wheelVolumeCompact; break;
                 case 603: g_cfg.showCpuCompact = !g_cfg.showCpuCompact; break;
                 case 605: SetAutoStart(!IsAutoStartEnabled()); break;
+                case 606: g_cfg.showMicMuteCompact = !g_cfg.showMicMuteCompact; break;
 
                 case 750: ResetTabOrder(); break;
                 case 751: g_cfg.showTabBadges = !g_cfg.showTabBadges; break;
                 case 752: g_cfg.persistClipboard = !g_cfg.persistClipboard; break;
 
-                    // Настройки Игрового режима
                 case 801:
                     g_cfg.gameModeActive = !g_cfg.gameModeActive;
                     if (g_cfg.gameModeActive) g_game.sessionStartTick = GetTickCount64();
@@ -742,6 +757,15 @@ inline LRESULT CALLBACK SettingsWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPAR
                 case 816: g_cfg.hudShowPing = !g_cfg.hudShowPing; break;
                 case 817: g_cfg.hudShowTimer = !g_cfg.hudShowTimer; break;
                 case 820: CleanSystemRam(); break;
+                case 830: g_cfg.pingTarget = 0; break;
+                case 831: g_cfg.pingTarget = 1; break;
+                case 832: g_cfg.pingTarget = 2; break;
+                case 833: g_cfg.pingTarget = 3; break;
+                case 910: g_cfg.fxSpringPhysics = !g_cfg.fxSpringPhysics; break;
+                case 911: g_cfg.fxAmbientGlow = !g_cfg.fxAmbientGlow;   break;
+                case 912: g_cfg.fxGlassRim = !g_cfg.fxGlassRim;      break;
+                case 913: g_cfg.fxSmoothTabs = !g_cfg.fxSmoothTabs;    break;
+                case 914: g_cfg.fxVinylBackdrop = !g_cfg.fxVinylBackdrop; break;
 
                 case 999: g_cfg = IslandConfig{}; break;
                 }

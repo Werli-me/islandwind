@@ -23,8 +23,6 @@
 #include <iphlpapi.h>
 #include <icmpapi.h>
 #include <pdh.h>
-
-#include <pdh.h>
 #include <pdhmsg.h>
 #ifndef PDH_MORE_DATA
 #define PDH_MORE_DATA ((PDH_STATUS)0x800007D2L)
@@ -81,7 +79,7 @@ constexpr int CANVAS_W = 560;
 constexpr int CANVAS_H = 310;
 constexpr float ISLAND_H_SHORT = 155.0f;
 constexpr float ISLAND_H_TALL = 236.0f;
-constexpr int kCustomTabCount = 7;
+constexpr int kCustomTabCount = 8;
 
 constexpr double LYRIC_LOOKAHEAD_SEC = 0.035;
 constexpr double LYRIC_MAX_SCROLL_WINDOW = 8.0;
@@ -98,24 +96,26 @@ constexpr UINT ID_TRAY_EXIT = 2001;
 constexpr UINT ID_TRAY_TOGGLE = 2002;
 constexpr UINT ID_TRAY_SETTINGS = 2003;
 constexpr UINT ID_TRAY_GAMEMODE = 2004;
-constexpr int HOTKEY_GAMEMODE_ID = 9001; // Горячая клавиша Alt + G
+constexpr int HOTKEY_GAMEMODE_ID = 9001;
 
 inline NOTIFYICONDATAW g_nid = {};
 
 enum class Tab {
     Music = 0,
-    Game = 1,
-    Clipboard = 2,
-    Calendar = 3,
-    Notes = 4,
-    Weather = 5,
-    Shelf = 6,
-    Phone = 7
+    Discord = 1,
+    Game = 2,
+    Clipboard = 3,
+    Calendar = 4,
+    Notes = 5,
+    Weather = 6,
+    Shelf = 7,
+    Phone = 8
 };
 
 inline const wchar_t* GetTabShortName(Tab t) {
     switch (t) {
     case Tab::Music:     return L"Плеер";
+    case Tab::Discord:   return L"Голос";
     case Tab::Game:      return L"Игры";
     case Tab::Clipboard: return L"Буфер";
     case Tab::Calendar:  return L"Дата";
@@ -129,10 +129,11 @@ inline const wchar_t* GetTabShortName(Tab t) {
 
 inline const wchar_t* GetTabFullName(Tab t) {
     switch (t) {
+    case Tab::Discord:   return L"Discord и Микрофон (Голосовой пульт)";
     case Tab::Game:      return L"Игровой монитор (FPS / Железо)";
     case Tab::Clipboard: return L"Буфер обмена";
     case Tab::Calendar:  return L"Календарь";
-    case Tab::Notes:     return L"Текст (Заметки)";
+    case Tab::Notes:     return L"Текст и To-Do список";
     case Tab::Weather:   return L"Погода";
     case Tab::Shelf:     return L"Полка файлов";
     case Tab::Phone:     return L"Телефон";
@@ -148,12 +149,19 @@ struct IslandConfig {
     bool minimalCompact = true;
     bool showMusicCompact = true;
 
+    // Визуальные эффекты Pro
+    bool fxSpringPhysics = true;
+    bool fxAmbientGlow = true;
+    bool fxGlassRim = true;
+    bool fxSmoothTabs = true;
+    bool fxVinylBackdrop = true;
+
     // Раздел «Внешний вид»
     bool dockToTop = true;
     int offsetX = 0;
     int posY = 0;
     float compactW = 128.0f;
-    float expandedW = 456.0f;
+    float expandedW = 468.0f;
     float expandedR = 20.0f;
     float bgOpacity = 0.96f;
     float animSpeed = 0.22f;
@@ -163,42 +171,43 @@ struct IslandConfig {
     // Раздел «Музыка» и круги под бит
     bool showEqualizer = true;
     bool dynamicAlbumAccent = true;
-    int beatCirclesMode = 1; // 0 = Выкл, 1 = Импульс, 2 = Неоновый ореол, 3 = Каскад
+    int beatCirclesMode = 1;
 
     // Раздел «Уведомления»
     int popupDurationSec = 4;
     bool soundOnNotify = false;
 
     // Раздел «Вкладки»
-    int tabOrder[kCustomTabCount] = { 1, 2, 3, 4, 5, 6, 7 };
-    bool tabEnabled[8] = { true, true, true, true, true, true, true, true };
+    int tabOrder[kCustomTabCount] = { 1, 2, 3, 4, 5, 6, 7, 8 };
+    bool tabEnabled[9] = { true, true, true, true, true, true, true, true, true };
     bool showTabBadges = true;
     bool persistClipboard = true;
 
     // Раздел «Игровой режим»
-    bool gameModeActive = false;       // Включен ли сейчас Игровой режим
-    int fullscreenBehavior = 1;        // 0 = Скрывать остров, 1 = Авто-Игровой HUD, 2 = Обычный вид
-    bool gameClickThrough = true;      // Пропускать клики мыши сквозь свёрнутый HUD в играх
-    bool hudShowFps = true;            // Показывать FPS
-    bool hudShowFrameTime = true;      // Показывать время кадра (мс)
-    bool hudShowCpu = true;            // Показывать нагрузку CPU (%)
-    bool hudShowGpu = true;            // Показывать нагрузку GPU (%)
-    bool hudShowVram = false;          // Показывать видеопамять VRAM (ГБ)
-    bool hudShowRam = true;            // Показывать ОЗУ (%)
-    bool hudShowPing = true;           // Показывать сетевой пинг (мс)
-    bool hudShowTimer = false;         // Показывать таймер сессии
+    bool gameModeActive = false;
+    int fullscreenBehavior = 1;
+    bool gameClickThrough = true;
+    bool hudShowFps = true;
+    bool hudShowFrameTime = true;
+    bool hudShowCpu = true;
+    bool hudShowGpu = true;
+    bool hudShowVram = false;
+    bool hudShowRam = true;
+    bool hudShowPing = true;
+    bool hudShowTimer = false;
+    int pingTarget = 0; // 0 = РФ (Яндекс), 1 = Стокгольм (Valve), 2 = Европа (1.1.1.1), 3 = Google (8.8.8.8)
 
     // Раздел «Питомец»
     int petType = 1;
 
     // Раздел «Система»
     bool capsLockAlert = true;
+    bool showMicMuteCompact = true; // Показывать красный индикатор выключенного микрофона в свёрнутом острове
     bool wheelVolumeCompact = true;
     bool showCpuCompact = false;
     bool hideInFullscreen = false;
 } g_cfg;
 
-// Живые показатели Игрового режима
 struct GameMetrics {
     std::atomic<int> fps{ 60 };
     std::atomic<float> frameTimeMs{ 16.6f };
@@ -212,7 +221,7 @@ struct GameMetrics {
     std::atomic<int> pingMs{ 24 };
 
     ULONGLONG sessionStartTick = 0;
-    std::vector<float> fpsHistory;     // История FPS для живого графика во вкладке «Игры»
+    std::vector<float> fpsHistory;
     std::wstring ramCleanStatus = L"";
     ULONGLONG ramCleanStatusUntil = 0;
     bool autoTriggeredByFs = false;
@@ -283,6 +292,14 @@ struct RuntimeExtras {
     float prevPeak = 0.0f;
     ULONGLONG lastBeatTick = 0;
     std::vector<BeatRing> beatRings;
+
+    // Для пружинной физики и плавных вкладок
+    float velW = 0.0f;
+    float velH = 0.0f;
+    float velR = 0.0f;
+    float smoothTabX = 0.0f;
+    float smoothTabW = 0.0f;
+    bool tabAnimInit = false;
 } g_extras;
 
 struct IslandState {
@@ -295,6 +312,7 @@ struct IslandState {
     bool isTypingCalNote = false;
     bool isDraggingVolume = false;
     bool isDraggingTimeline = false;
+    bool isDraggingDiscordVol = false;
     bool isDragOver = false;
     bool isDraggingOut = false;
     bool isDraggingWindow = false;
@@ -386,7 +404,6 @@ inline void UpdateCpuUsage() {
     g_extras.prevUserTime = user;
 }
 
-// Очистка неиспользуемой оперативной памяти фоновых процессов перед игрой
 inline void CleanSystemRam() {
     MEMORYSTATUSEX memBefore = { sizeof(memBefore) };
     GlobalMemoryStatusEx(&memBefore);
@@ -413,12 +430,25 @@ inline void CleanSystemRam() {
     TriggerMiniBadge(L"RAM -" + std::to_wstring(freedMb) + L"МБ", true, 2200);
 }
 
-// Фоновый поток сбора игровых метрик (FPS, Frametime, GPU, VRAM, RAM, Ping)
+inline ULONG GetPingTargetIp() {
+    auto makeIp = [](uint8_t a, uint8_t b, uint8_t c, uint8_t d) -> ULONG {
+        return static_cast<ULONG>(a) |
+            (static_cast<ULONG>(b) << 8) |
+            (static_cast<ULONG>(c) << 16) |
+            (static_cast<ULONG>(d) << 24);
+        };
+    switch (g_cfg.pingTarget) {
+    case 0:  return makeIp(77, 88, 8, 8);       // РФ (Яндекс)
+    case 1:  return makeIp(155, 133, 248, 34);  // Стокгольм (Valve)
+    case 2:  return makeIp(1, 1, 1, 1);         // Европа (Cloudflare)
+    default: return makeIp(8, 8, 8, 8);         // Google
+    }
+}
+
 inline void StartGameMetricsWorker() {
     g_game.sessionStartTick = GetTickCount64();
 
     std::thread([]() {
-        // 1. Инициализация DXGI 1.4 для чтения видеопамяти VRAM
         IDXGIFactory4* pDxgiFactory = nullptr;
         IDXGIAdapter3* pDxgiAdapter = nullptr;
         if (SUCCEEDED(CreateDXGIFactory1(__uuidof(IDXGIFactory4), (void**)&pDxgiFactory)) && pDxgiFactory) {
@@ -429,7 +459,6 @@ inline void StartGameMetricsWorker() {
             }
         }
 
-        // 2. Инициализация PDH-счетчика для чтения загрузки 3D-ядра GPU
         PDH_HQUERY hGpuQuery = nullptr;
         PDH_HCOUNTER hGpuCounter = nullptr;
         bool hasPdhGpu = false;
@@ -440,7 +469,6 @@ inline void StartGameMetricsWorker() {
             }
         }
 
-        // 3. Дескриптор ICMP для измерения реального пинга
         HANDLE hIcmp = IcmpCreateFile();
 
         LARGE_INTEGER qpcFreq = {}, lastQpc = {};
@@ -453,7 +481,6 @@ inline void StartGameMetricsWorker() {
         while (g_running) {
             UpdateCpuUsage();
 
-            // Чтение ОЗУ (RAM)
             MEMORYSTATUSEX mem = { sizeof(mem) };
             if (GlobalMemoryStatusEx(&mem)) {
                 g_game.ramPct.store(static_cast<int>(mem.dwMemoryLoad));
@@ -463,7 +490,6 @@ inline void StartGameMetricsWorker() {
                 g_game.ramUsedGb.store(usedGb);
             }
 
-            // Чтение VRAM через DXGI 1.4
             if (pDxgiAdapter) {
                 DXGI_QUERY_VIDEO_MEMORY_INFO vramInfo = {};
                 if (SUCCEEDED(pDxgiAdapter->QueryVideoMemoryInfo(0, DXGI_MEMORY_SEGMENT_GROUP_LOCAL, &vramInfo))) {
@@ -474,7 +500,6 @@ inline void StartGameMetricsWorker() {
                 }
             }
 
-            // Чтение загрузки GPU (%)
             int gpuLoad = 0;
             if (hasPdhGpu && PdhCollectQueryData(hGpuQuery) == ERROR_SUCCESS) {
                 DWORD bufSize = 0, itemCount = 0;
@@ -493,13 +518,11 @@ inline void StartGameMetricsWorker() {
                 }
             }
             if (gpuLoad == 0 && g_game.vramTotalGb.load() > 0.5f) {
-                // Оценка по активности видеопамяти и CPU, если драйвер скрывает PDH
                 float vramRatio = g_game.vramUsedGb.load() / g_game.vramTotalGb.load();
                 gpuLoad = std::clamp(static_cast<int>(vramRatio * 65.0f + g_game.cpuPct.load() * 0.35f), 2, 99);
             }
             g_game.gpuPct.store(gpuLoad);
 
-            // Чтение реального FPS и времени кадра через DWM / частоту обновления монитора
             HDC screenDC = GetDC(nullptr);
             int refreshHz = GetDeviceCaps(screenDC, VREFRESH);
             ReleaseDC(nullptr, screenDC);
@@ -524,14 +547,14 @@ inline void StartGameMetricsWorker() {
             g_game.fps.store(measuredFps);
             g_game.frameTimeMs.store(ftMs);
 
-            // Сетевой пинг каждые 2 секунды (ICMP до 8.8.8.8)
+            static int s_lastTarget = -1;
             ULONGLONG nowTick = GetTickCount64();
-            if (hIcmp != INVALID_HANDLE_VALUE && nowTick - lastPingCheck >= 2000) {
+            if (hIcmp != INVALID_HANDLE_VALUE && (nowTick - lastPingCheck >= 1500 || s_lastTarget != g_cfg.pingTarget)) {
                 lastPingCheck = nowTick;
+                s_lastTarget = g_cfg.pingTarget;
                 char sendData[16] = "IslandPingCheck";
                 char replyBuf[sizeof(ICMP_ECHO_REPLY) + 32] = {};
-                // 0x08080808 = 8.8.8.8 (одинаково в big/little endian)
-                DWORD res = IcmpSendEcho(hIcmp, 0x08080808, sendData, sizeof(sendData), nullptr, replyBuf, sizeof(replyBuf), 800);
+                DWORD res = IcmpSendEcho(hIcmp, GetPingTargetIp(), sendData, sizeof(sendData), nullptr, replyBuf, sizeof(replyBuf), 800);
                 if (res > 0) {
                     auto* reply = reinterpret_cast<ICMP_ECHO_REPLY*>(replyBuf);
                     g_game.pingMs.store(std::clamp(static_cast<int>(reply->RoundTripTime), 1, 999));
@@ -638,10 +661,17 @@ inline void SaveConfig() {
     writeInt(L"HudShowRam", g_cfg.hudShowRam ? 1 : 0);
     writeInt(L"HudShowPing", g_cfg.hudShowPing ? 1 : 0);
     writeInt(L"HudShowTimer", g_cfg.hudShowTimer ? 1 : 0);
+    writeInt(L"PingTarget", g_cfg.pingTarget);
     writeInt(L"PetType", g_cfg.petType);
     writeInt(L"CapsLockAlert", g_cfg.capsLockAlert ? 1 : 0);
+    writeInt(L"ShowMicMuteCompact", g_cfg.showMicMuteCompact ? 1 : 0);
     writeInt(L"WheelVolumeCompact", g_cfg.wheelVolumeCompact ? 1 : 0);
     writeInt(L"ShowCpuCompact", g_cfg.showCpuCompact ? 1 : 0);
+    writeInt(L"FxSpringPhysics", g_cfg.fxSpringPhysics ? 1 : 0);
+    writeInt(L"FxAmbientGlow", g_cfg.fxAmbientGlow ? 1 : 0);
+    writeInt(L"FxGlassRim", g_cfg.fxGlassRim ? 1 : 0);
+    writeInt(L"FxSmoothTabs", g_cfg.fxSmoothTabs ? 1 : 0);
+    writeInt(L"FxVinylBackdrop", g_cfg.fxVinylBackdrop ? 1 : 0);
 }
 
 inline void LoadConfig() {
@@ -655,7 +685,7 @@ inline void LoadConfig() {
     g_cfg.offsetX = static_cast<int>(GetPrivateProfileIntW(L"Island", L"OffsetX", 0, ini.c_str()));
     g_cfg.posY = std::clamp(static_cast<int>(GetPrivateProfileIntW(L"Island", L"PosY", 0, ini.c_str())), 0, 200);
     g_cfg.compactW = std::clamp(static_cast<float>(GetPrivateProfileIntW(L"Island", L"CompactW", 128, ini.c_str())), 114.0f, 240.0f);
-    g_cfg.expandedW = std::clamp(static_cast<float>(GetPrivateProfileIntW(L"Island", L"ExpandedW", 456, ini.c_str())), 360.0f, 500.0f);
+    g_cfg.expandedW = std::clamp(static_cast<float>(GetPrivateProfileIntW(L"Island", L"ExpandedW", 468, ini.c_str())), 360.0f, 520.0f);
     g_cfg.expandedR = std::clamp(static_cast<float>(GetPrivateProfileIntW(L"Island", L"ExpandedR", 20, ini.c_str())), 10.0f, 38.0f);
     g_cfg.bgOpacity = std::clamp(GetPrivateProfileIntW(L"Island", L"BgOpacityPct", 96, ini.c_str()) / 100.0f, 0.40f, 1.0f);
     g_cfg.animSpeed = std::clamp(GetPrivateProfileIntW(L"Island", L"AnimSpeedPct", 22, ini.c_str()) / 100.0f, 0.08f, 0.45f);
@@ -669,7 +699,7 @@ inline void LoadConfig() {
     g_cfg.showTabBadges = GetPrivateProfileIntW(L"Island", L"ShowTabBadges", 1, ini.c_str()) != 0;
     g_cfg.persistClipboard = GetPrivateProfileIntW(L"Island", L"PersistClipboard", 1, ini.c_str()) != 0;
 
-    bool seen[8] = {};
+    bool seen[9] = {};
     bool validOrder = true;
     for (int i = 0; i < kCustomTabCount; ++i) {
         std::wstring kOrd = L"TabOrder" + std::to_wstring(i);
@@ -697,11 +727,18 @@ inline void LoadConfig() {
     g_cfg.hudShowRam = GetPrivateProfileIntW(L"Island", L"HudShowRam", 1, ini.c_str()) != 0;
     g_cfg.hudShowPing = GetPrivateProfileIntW(L"Island", L"HudShowPing", 1, ini.c_str()) != 0;
     g_cfg.hudShowTimer = GetPrivateProfileIntW(L"Island", L"HudShowTimer", 0, ini.c_str()) != 0;
+    g_cfg.pingTarget = std::clamp(static_cast<int>(GetPrivateProfileIntW(L"Island", L"PingTarget", 0, ini.c_str())), 0, 3);
 
     g_cfg.petType = std::clamp(static_cast<int>(GetPrivateProfileIntW(L"Island", L"PetType", 1, ini.c_str())), 0, 2);
     g_cfg.capsLockAlert = GetPrivateProfileIntW(L"Island", L"CapsLockAlert", 1, ini.c_str()) != 0;
+    g_cfg.showMicMuteCompact = GetPrivateProfileIntW(L"Island", L"ShowMicMuteCompact", 1, ini.c_str()) != 0;
     g_cfg.wheelVolumeCompact = GetPrivateProfileIntW(L"Island", L"WheelVolumeCompact", 1, ini.c_str()) != 0;
     g_cfg.showCpuCompact = GetPrivateProfileIntW(L"Island", L"ShowCpuCompact", 0, ini.c_str()) != 0;
+    g_cfg.fxSpringPhysics = GetPrivateProfileIntW(L"Island", L"FxSpringPhysics", 1, ini.c_str()) != 0;
+    g_cfg.fxAmbientGlow = GetPrivateProfileIntW(L"Island", L"FxAmbientGlow", 1, ini.c_str()) != 0;
+    g_cfg.fxGlassRim = GetPrivateProfileIntW(L"Island", L"FxGlassRim", 1, ini.c_str()) != 0;
+    g_cfg.fxSmoothTabs = GetPrivateProfileIntW(L"Island", L"FxSmoothTabs", 1, ini.c_str()) != 0;
+    g_cfg.fxVinylBackdrop = GetPrivateProfileIntW(L"Island", L"FxVinylBackdrop", 1, ini.c_str()) != 0;
 }
 
 inline bool IsAutoStartEnabled() {
@@ -745,7 +782,6 @@ inline void ApplyWindowPosition(HWND hwnd) {
     SetWindowPos(hwnd, HWND_TOPMOST, winX, winY, CANVAS_W, CANVAS_H, SWP_NOSIZE | SWP_NOACTIVATE);
 }
 
-// Детектор полноэкранного приложения (3D-игры или видео)
 inline bool IsFullscreenWindowFocused(HWND islandHwnd) {
     HWND fg = GetForegroundWindow();
     if (!fg || fg == islandHwnd || fg == g_hSettingsWnd) return false;
@@ -769,7 +805,6 @@ inline bool IsFullscreenWindowFocused(HWND islandHwnd) {
     return coversScreen && !(style & WS_CAPTION);
 }
 
-// Управление прозрачностью окна для кликов мыши (Click-Through в играх)
 inline void UpdateClickThroughState(HWND hwnd) {
     if (!hwnd) return;
     bool altHeld = (GetAsyncKeyState(VK_MENU) & 0x8000) != 0;
@@ -821,7 +856,6 @@ inline bool IsAnyTypingActive() {
     return g_state.isTypingCity || g_state.isTypingNote || g_state.isTypingCalNote;
 }
 
-// Расчет оптимальной ширины компактного Игрового HUD под включенные датчики
 inline float CalcGameHudCompactWidth() {
     float w = 26.0f;
     if (g_cfg.hudShowFps) w += g_cfg.hudShowFrameTime ? 102.0f : 62.0f;
@@ -836,8 +870,8 @@ inline float CalcGameHudCompactWidth() {
 
 inline void UpdateTargets() {
     if (g_state.isHovered || IsAnyTypingActive() || g_state.isDraggingVolume ||
-        g_state.isDraggingTimeline || g_state.isDragOver || g_phoneEvent.hasActiveEvent ||
-        g_state.isDraggingWindow || g_state.isDraggingTabOnIsland) {
+        g_state.isDraggingTimeline || g_state.isDraggingDiscordVol || g_state.isDragOver ||
+        g_phoneEvent.hasActiveEvent || g_state.isDraggingWindow || g_state.isDraggingTabOnIsland) {
         g_state.targetW = g_cfg.expandedW;
         g_state.targetH = (g_phoneEvent.hasActiveEvent && !g_state.isHovered)
             ? ISLAND_H_SHORT
@@ -855,20 +889,48 @@ inline void UpdateTargets() {
 }
 
 inline void StepAnimation() {
-    if (!g_state.isAnimating) return;
+    float speed = std::clamp(g_cfg.animSpeed, 0.08f, 0.65f);
 
-    const float k = g_cfg.animSpeed;
-    g_state.curW = Lerp(g_state.curW, g_state.targetW, k);
-    g_state.curH = Lerp(g_state.curH, g_state.targetH, k);
-    g_state.curR = Lerp(g_state.curR, g_state.targetR, k);
+    if (g_cfg.fxSpringPhysics) {
+        float stiffness = speed * 0.95f;
+        float damping = 0.72f;
 
-    if (std::fabs(g_state.curW - g_state.targetW) < 0.5f &&
-        std::fabs(g_state.curH - g_state.targetH) < 0.5f &&
-        std::fabs(g_state.curR - g_state.targetR) < 0.5f) {
-        g_state.curW = g_state.targetW;
-        g_state.curH = g_state.targetH;
-        g_state.curR = g_state.targetR;
-        g_state.isAnimating = false;
+        g_extras.velW = (g_extras.velW + (g_state.targetW - g_state.curW) * stiffness) * damping;
+        g_extras.velH = (g_extras.velH + (g_state.targetH - g_state.curH) * stiffness) * damping;
+        g_extras.velR = (g_extras.velR + (g_state.targetR - g_state.curR) * stiffness) * damping;
+
+        g_state.curW += g_extras.velW;
+        g_state.curH += g_extras.velH;
+        g_state.curR += g_extras.velR;
+
+        if (std::fabs(g_state.targetW - g_state.curW) < 0.35f && std::fabs(g_extras.velW) < 0.25f &&
+            std::fabs(g_state.targetH - g_state.curH) < 0.35f && std::fabs(g_extras.velH) < 0.25f) {
+            g_state.curW = g_state.targetW;
+            g_state.curH = g_state.targetH;
+            g_state.curR = g_state.targetR;
+            g_extras.velW = g_extras.velH = g_extras.velR = 0.0f;
+            g_state.isAnimating = false;
+        }
+        else {
+            g_state.isAnimating = true;
+        }
+    }
+    else {
+        g_state.curW = Lerp(g_state.curW, g_state.targetW, speed);
+        g_state.curH = Lerp(g_state.curH, g_state.targetH, speed);
+        g_state.curR = Lerp(g_state.curR, g_state.targetR, speed);
+        g_extras.velW = g_extras.velH = g_extras.velR = 0.0f;
+
+        if (std::fabs(g_state.curW - g_state.targetW) < 0.4f &&
+            std::fabs(g_state.curH - g_state.targetH) < 0.4f) {
+            g_state.curW = g_state.targetW;
+            g_state.curH = g_state.targetH;
+            g_state.curR = g_state.targetR;
+            g_state.isAnimating = false;
+        }
+        else {
+            g_state.isAnimating = true;
+        }
     }
 }
 
